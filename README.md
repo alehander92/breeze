@@ -24,6 +24,22 @@ nnkCall.newTree(nnkDotExpr.newTree(e, newIdentNode(! "f")),
                 nnkInfix.newTree(newIdentNode(! "+"), newLit(2), newLit(3)))
 ```
 
+It's equivalent to
+
+```nim
+macro s(b: untyped): untyped =
+  var e = newIdentNode(!"e")
+  result = buildMacro:
+    call:
+      dotExpr:
+        e
+        ident("f")
+      infix:
+        ident("+")
+        2
+        3
+```
+
 ## functionality
 
 You use it invoking `buildMacro` with a singular child corresponding to the node you want to build
