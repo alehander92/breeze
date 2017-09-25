@@ -1,6 +1,6 @@
 import macros, strutils, sequtils, tables
 
-const debugMacro = false
+const debugMacro = true
 
 proc build(b: NimNode): NimNode
 
@@ -131,11 +131,30 @@ macro buildMacro*(b: untyped): untyped =
   var stmtsNode = newIdentNode(!"stmts")
   var lastNode = newIdentNode(!"last")
   var x = newIdentNode(!"x")
-  result = quote:
+  var resultNode = newIdentNode(!"result")
+  var start = quote:
     var `stmtsNode` = nnkStmtList.newTree()
     var `lastNode` = `stmtsNode`
     var `x`: NimNode
-  result.add(build(b))
+  var finish = quote:
+    `resultNode` = `stmtsNode`
+  
+  start.add(build(b))
+  start.add(finish)
+  var empty = newEmptyNode()
+  
+  result = nnkCall.newTree(
+    nnkPar.newTree(
+      nnkLambda.newTree(
+        empty,
+        empty,
+        empty,
+        nnkFormalParams.newTree(
+          newIdentNode(!"NimNode")),
+        empty,
+        empty,
+        start)))
+
   when debugMacro:
     echo "build: $1" % repr(result)
 
