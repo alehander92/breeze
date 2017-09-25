@@ -1,4 +1,4 @@
-version         = "0.0.4"
+version         = "0.0.5"
 packageName     = "breeze"
 author          = "Alexander Ivanov"
 description     = "macro dsl"

@@ -1,6 +1,6 @@
 import macros, strutils, sequtils, tables
 
-const debugMacro = true
+const debugMacro = false
 
 proc build(b: NimNode): NimNode
 
