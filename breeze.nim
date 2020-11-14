@@ -1,4 +1,4 @@
-import macros, strutils, sequtils
+import macros, sequtils
 
 proc build(b: NimNode): NimNode
 
@@ -13,6 +13,13 @@ proc buildInline(args: NimNode): seq[NimNode] =
       result.add(build(child))
     else:
       isArg = true
+
+proc labelOf(b: NimNode): string =
+  expectKind b, {nnkIdent, nnkAccQuoted}
+  if b.kind == nnkAccQuoted:
+    result = labelOf(b[0])
+  else:
+    result = $b
 
 proc buildIdent(b: NimNode): NimNode =
   result = nnkCall.newTree(
@@ -31,7 +38,7 @@ proc build(b: NimNode): NimNode =
   of nnkVarSection:
     result = b
   of nnkCall:
-    var label = name(b[0])
+    var label = labelOf(b[0])
     if label.eqIdent"ident":
       result = buildIdent(newLit($b[1]))
       result = quote:
@@ -144,19 +151,9 @@ macro buildMacro*(b: untyped): untyped =
     echo "build:\n", repr(result)
 
 when isMainModule:
-  macro cases(state, event, table: untyped): untyped =
-    expectKind(table[0], nnkBracket)
+  macro s(b: untyped): untyped =
+    var e = newIdentNode("e")
     result = buildMacro:
-      caseStmt(state):
-        for n in table[0]:
-          expectKind(n, nnkExprColonExpr)
-          expectKind(n[1], nnkBracket)
-          expectMinLen(n[1], 1)
-          ofBranch(n[0]):
-            ifStmt:
-              for m in n[1]:
-                expectKind(m, nnkExprColonExpr)
-                elifBranch(call(ident"==", m[0], event)):
-                  asgn(state, call(m[1]))
-              `else`:
-                discardStmt(empty)
+      call:
+        dotExpr(e, ident("f"))
+        infix(ident("+"), 2, 3)
