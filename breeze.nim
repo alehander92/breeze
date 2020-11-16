@@ -1,6 +1,4 @@
-import macros, strutils, sequtils, tables
-
-const debugMacro = false
+import macros, sequtils
 
 proc build(b: NimNode): NimNode
 
@@ -17,24 +15,21 @@ proc buildInline(args: NimNode): seq[NimNode] =
       isArg = true
 
 proc labelOf(b: NimNode): string =
-  assert b.kind in {nnkIdent, nnkAccQuoted}
+  expectKind b, {nnkIdent, nnkAccQuoted}
   if b.kind == nnkAccQuoted:
     result = labelOf(b[0])
   else:
-    result = $b.ident
+    result = $b
 
 proc buildIdent(b: NimNode): NimNode =
   result = nnkCall.newTree(
-    newIdentNode(!"newIdentNode"),
-    nnkPrefix.newTree(
-      newIdentNode(!"!"),
-      b))
+    newIdentNode("newIdentNode"), b)
 
 proc build(b: NimNode): NimNode =
-  var resultNode = newIdentNode(!"result")
-  var stmtsNode = newIdentNode(!"stmts")
-  var lastNode = newIdentNode(!"last")
-  var x = newIdentNode(!"x")
+  var resultNode = newIdentNode("result")
+  var stmtsNode = newIdentNode("stmts")
+  var lastNode = newIdentNode("last")
+  var x = newIdentNode("x")
   case b.kind:
   of nnkStmtList:
     result = nnkStmtList.newTree()
@@ -44,8 +39,7 @@ proc build(b: NimNode): NimNode =
     result = b
   of nnkCall:
     var label = labelOf(b[0])
-    case label:
-    of "ident":
+    if label.eqIdent"ident":
       result = buildIdent(newLit($b[1]))
       result = quote:
         `lastNode`.add(`result`)
@@ -55,11 +49,11 @@ proc build(b: NimNode): NimNode =
         args = buildCall(b[1])
       else:
         args = buildInline(b)
-      var callIdent = newIdentNode(!("nnk$1" % capitalizeAscii(label)))
+      var callIdent = newIdentNode("nnk" & $label)
       result = nnkCall.newTree(
         nnkDotExpr.newTree(
           callIdent,
-          newIdentNode(!"newTree")))
+          newIdentNode("newTree")))
       result = quote:
         `x` = `result`
         `lastNode`.add(`x`)
@@ -72,14 +66,14 @@ proc build(b: NimNode): NimNode =
       result.add(b)
   of nnkCharLit..nnkUInt64Lit, nnkFloatLit..nnkFloat64Lit, nnkStrLit..nnkTripleStrLit:
     result = nnkCall.newTree(
-      newIdentNode(!"newLit"),
+      newIdentNode("newLit"),
       b)
     result = quote:
       `lastNode`.add(`result`)
   of nnkIdent:
     if $b == "true" or $b == "false":
       result = nnkCall.newTree(
-        newIdentNode(!"newLit"),
+        newIdentNode("newLit"),
         b)
     else:
       result = b
@@ -103,7 +97,7 @@ proc build(b: NimNode): NimNode =
           build(branch[0])))
   of nnkInfix:
     if b[1].kind == nnkStrLit:
-      var newLitNode = newIdentNode(!"newLit")
+      var newLitNode = newIdentNode("newLit")
       result = quote:
         `newLitNode`(`b`)
     else:
@@ -122,27 +116,25 @@ proc build(b: NimNode): NimNode =
   else:
     result = quote:
       `lastNode`.add(`b`)
-    when debugMacro:
-      echo treerepr(b)
-    else:
-      discard
+    when defined(debugBreeze):
+      echo treeRepr(b)
 
 macro buildMacro*(b: untyped): untyped =
-  var stmtsNode = newIdentNode(!"stmts")
-  var lastNode = newIdentNode(!"last")
-  var x = newIdentNode(!"x")
-  var resultNode = newIdentNode(!"result")
+  var stmtsNode = newIdentNode("stmts")
+  var lastNode = newIdentNode("last")
+  var x = newIdentNode("x")
+  var resultNode = newIdentNode("result")
   var start = quote:
     var `stmtsNode` = nnkStmtList.newTree()
     var `lastNode` = `stmtsNode`
     var `x`: NimNode
   var finish = quote:
     `resultNode` = `stmtsNode`
-  
+
   start.add(build(b))
   start.add(finish)
   var empty = newEmptyNode()
-  
+
   result = nnkCall.newTree(
     nnkPar.newTree(
       nnkLambda.newTree(
@@ -150,11 +142,18 @@ macro buildMacro*(b: untyped): untyped =
         empty,
         empty,
         nnkFormalParams.newTree(
-          newIdentNode(!"NimNode")),
+          newIdentNode("NimNode")),
         empty,
         empty,
         start)))
 
-  when debugMacro:
-    echo "build: $1" % repr(result)
+  when defined(debugBreeze):
+    echo "build:\n", repr(result)
 
+when isMainModule:
+  macro s(b: untyped): untyped =
+    var e = newIdentNode("e")
+    result = buildMacro:
+      call:
+        dotExpr(e, ident("f"))
+        infix(ident("+"), 2, 3)
